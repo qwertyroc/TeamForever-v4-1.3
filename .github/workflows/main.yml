@@ -38,7 +38,7 @@ jobs:
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # Generate Info.plist if missing
+          # Generate Info.plist if missing (WITH FILES APP PERMISSIONS!)
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -48,14 +48,21 @@ jobs:
               <key>CFBundleExecutable</key>
               <string>$(EXECUTABLE_NAME)</string>
               <key>CFBundleIdentifier</key>
-              <string>com.roctg.rsdk</string>
+              <string>com.retro.rsdk</string>
+              
               <key>CFBundleName</key>
+              <string>RSDKV4</string>
+              <key>CFBundleDisplayName</key>
               <string>RSDKV4</string>
               <key>CFBundleShortVersionString</key>
               <string>1.0</string>
               <key>CFBundleVersion</key>
               <string>1</string>
               <key>UIRequiresFullScreen</key>
+              <true/>
+              <key>UIFileSharingEnabled</key>
+              <true/>
+              <key>LSSupportsOpeningDocumentsInPlace</key>
               <true/>
           </dict>
           </plist>
@@ -123,7 +130,5 @@ jobs:
       - name: Upload Playable IPA
         uses: actions/upload-artifact@v4
         with:
-          name: rsdkv4-iOS
-          path: RSDKv4.ipa
           name: RSDK4-iOS
           path: RSDKv4.ipa
