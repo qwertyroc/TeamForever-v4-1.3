@@ -47,14 +47,11 @@ jobs:
             sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
           fi
           
-          # 3. Create missing C++ files (ONLY if they are missing from your repo)
-          touch ./RSDKv4/RetroGameLoop.cpp
-          touch ./RSDKv4/PauseMenu.cpp
-          
-          # 4. Create the dummy Data.rsdk (The app will use your real one from Files app)
+
+          # 3. Create the dummy Data.rsdk (The app will use your real one from Files app)
           touch dependencies/ios/Data.rsdk
           
-          # 5. Create valid Info.plist
+          # 4. Create valid Info.plist
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -64,9 +61,9 @@ jobs:
               <key>CFBundleExecutable</key>
               <string>$(EXECUTABLE_NAME)</string>
               <key>CFBundleIdentifier</key>
-              <string>com.retro.rsdk</string>
+              <string>com.roctg.rsdk</string>
               <key>CFBundleName</key>
-              <string>Sonic CD</string>
+              <string>RSDK4</string>
               <key>CFBundleShortVersionString</key>
               <string>1.0</string>
               <key>CFBundleVersion</key>
@@ -80,12 +77,12 @@ jobs:
           EOF
           fi
           
-          # 6. Create Empty SDLMain to satisfy linker
+          # 5. Create Empty SDLMain to satisfy linker
           echo "void dummy_empty_function() {}" > empty_main.c
           clang -c empty_main.c -target arm64-apple-ios13.0 -o empty_main.o
           ar rcs dependencies/ios/libSDLMain.a empty_main.o
           
-          # 7. Remove legacy SDLMain flag
+          # 6. Remove legacy SDLMain flag
           sed -i '' 's/-lSDLMain//g' "RSDKv4 ios.xcodeproj/project.pbxproj"
         shell: /bin/bash -e {0}
 
