@@ -4,54 +4,47 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: macos-latest
+    name: Build RSDKv4 iOS
+    # macos-latest currently defaults to a runner that supports newer Xcode versions
+    runs-on: macos-latest 
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive # Ensures theoraplay and other submodules are fetched if applicable
 
       - name: Install Dependencies
         run: |
+          brew update
           brew install sdl2 libvorbis libogg tinyxml2
 
-      - name: Patch Source Code
+      - name: Locate theoraplay.h (Diagnostic)
         run: |
-          # Fix case-sensitivity include issue in RetroEngine.hpp
-          sed -i '' 's|#include <Vorbis/vorbisfile.h>|#include <vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
-      - name: Ensure Assets Exist
-        run: |
-          # Check if the file is missing
-          if [ ! -f "./dependencies/ios/Data.rsdk" ]; then
-            echo "Data.rsdk is missing! Attempting to locate or create a placeholder."
-            
-            # OPTION 1: If it's just a blank data file for testing:
-            touch ./dependencies/ios/Data.rsdk
-            
-            # OPTION 2: If you have a download script or location, uncomment below:
-            # curl -o ./dependencies/ios/Data.rsdk https://your-server.com/path/to/Data.rsdk
-          else
-            echo "Data.rsdk found."
-          fi
-      - name: Validate Assets
-        run: |
-          echo "Checking for Data.rsdk..."
-          ls -l ./dependencies/ios/Data.rsdk || echo "Data.rsdk is missing!"
-          echo "Listing contents of dependencies/ios/ to see what is there:"
-          ls -R ./dependencies/ios/
-      - name: Locate Header
-        run: |
-          echo "Searching for theoraplay.h..."
+          echo "Searching for theoraplay.h in the repository..."
           find . -name "theoraplay.h"
-      - name: Build Project
+
+      - name: Build iOS App
         run: |
           # Define paths using brew
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
-          TINYXML_INC=$(brew --prefix tinyxml2)/include         
-          HEADERS="./RSDKv4 ./dependencies/ios ./theoraplay/src $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          TINYXML_INC=$(brew --prefix tinyxml2)/include
           
-          # Run build
-          # OTHER_CFLAGS="-Wno-deprecated-declarations" ignores the sprintf/error issue
+          # Use absolute path for the workspace root to prevent relative path resolution issues
+          ROOT_DIR=$(pwd)
+          
+          # Construct Header Search Paths using absolute paths
+          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/theoraplay/src $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          
+          # Construct Library Search Paths using absolute paths
+          LIBS="$ROOT_DIR/dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib"
+          
+          echo "Using Header Search Paths: $HEADERS"
+          
+          # Run xcodebuild
+          # Added -H to OTHER_CFLAGS to print included headers for debugging
           xcodebuild clean build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -64,6 +57,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             HEADER_SEARCH_PATHS="$HEADERS" \
-            LIBRARY_SEARCH_PATHS="./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib" \
+            LIBRARY_SEARCH_PATHS="$LIBS" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error -H"
+        shell: /bin/bash -e {0}
