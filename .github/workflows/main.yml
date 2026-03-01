@@ -23,7 +23,7 @@ jobs:
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
 
-      - name: Build
+            - name: Build
         run: |
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
@@ -37,6 +37,7 @@ jobs:
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
+
 
 
 
