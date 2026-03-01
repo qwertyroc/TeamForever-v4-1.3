@@ -1,13 +1,15 @@
 name: iOS RSDK Build
+
 on:
   push:
   pull_request:
+
 jobs:
   build:
     name: Build RSDKv4 for iOS
     runs-on: macos-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -16,42 +18,37 @@ jobs:
       - name: Install Dependencies
         run: brew install sdl2 libogg libvorbis tinyxml2
 
+      - name: Configure Build Environment
+        run: |
+          # Create an xcconfig to handle paths cleanly without overriding defaults
+          cat <<EOF > ci.xcconfig
+          HEADER_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/include $(brew --prefix libvorbis)/include $(brew --prefix libogg)/include $(brew --prefix tinyxml2)/include
+          LIBRARY_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib
+          GCC_PREPROCESSOR_DEFINITIONS = \$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES
+          EOF
+
       - name: Install theoraplay
         run: |
           git clone https://github.com/icculus/theoraplay.git /tmp/theoraplay
+          mkdir -p dependencies/ios
           cp /tmp/theoraplay/theoraplay.h dependencies/ios/theoraplay.h
           cp /tmp/theoraplay/theoraplay.c dependencies/ios/theoraplay.c
 
       - name: Build and Pack
         run: |
-          SDL2_PATH=$(brew --prefix sdl2)
-          VORBIS_PATH=$(brew --prefix libvorbis)
-          OGG_PATH=$(brew --prefix libogg)
-          TINYXML2_PATH=$(brew --prefix tinyxml2)
-          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES'
-
-          mkdir -p dependencies/ios
-          touch dependencies/ios/Data.rsdk
-
+          # Use -xcconfig to load the paths we just defined
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
                      -configuration Release \
                      -derivedDataPath ./build \
+                     -xcconfig ci.xcconfig \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_IDENTITY="" \
-                     PROVISIONING_PROFILE_SPECIFIER="" \
-                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
-                     HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include $OGG_PATH/include $TINYXML2_PATH/include" \
-                     LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
-                     GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
-                     EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
 
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
-          if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
           cp -r "$APP_DIR" Payload/
           zip -r RSDKv4.ipa Payload
 
