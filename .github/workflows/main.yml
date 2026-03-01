@@ -58,7 +58,21 @@ jobs:
           # Ensure LaunchScreen exists if the project expects it
           mkdir -p dependencies/ios/Base.lproj
           echo '<?xml version="1.0" encoding="UTF-8"?><document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES"><device id="retina4_7" orientation="portrait" appearance="light"/><dependencies><plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104"/></dependencies><scenes><scene sceneID="EHf-IW-A2E"><objects><viewController id="01J-lp-oVM" sceneMemberID="viewController"><view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3"><rect key="frame" x="0.0" y="0.0" width="375" height="667"/><autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/><color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/><viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/></view></viewController><placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/></objects><point key="canvasLocation" x="53" y="375"/></scene></scenes></document>' > dependencies/ios/Base.lproj/LaunchScreen.storyboard
-
+      - name: Apply Source Patches
+        run: |
+          # Define patches as "search_pattern:replace_pattern"
+          patches=(
+            "<Vorbis\/vorbisfile.h>:<vorbis\/vorbisfile.h>"
+            "<Vorbis\/codec.h>:<vorbis\/codec.h>"
+            "REGION_JP:RETRO_JP"
+          )
+          
+          echo "Applying source code patches..."
+          for patch in "${patches[@]}"; do
+            IFS=":" read -r old new <<< "$patch"
+            echo "Replacing '$old' with '$new'..."
+            find . -type f \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '' "s/$old/$new/g" {} +
+          done
       - name: Build with xcodebuild
         run: |
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
