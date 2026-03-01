@@ -23,6 +23,17 @@ jobs:
           cp /tmp/theoraplay/theoraplay.h dependencies/ios/theoraplay.h
           cp /tmp/theoraplay/theoraplay.c dependencies/ios/theoraplay.c
 
+      - name: Create NativeObjects stub
+        run: |
+          mkdir -p dependencies/ios
+          # Only create the stub if NativeObjects.hpp doesn't already exist in the repo
+          if [ ! -f "dependencies/ios/NativeObjects.hpp" ] && [ ! -f "RSDKv4/NativeObjects.hpp" ]; then
+            cat > dependencies/ios/NativeObjects.hpp << 'STUB'
+          #pragma once
+          // Stub NativeObjects.hpp for CI build
+          STUB
+          fi
+
       - name: Build and Pack
         run: |
           SDL2_PATH=$(brew --prefix sdl2)
