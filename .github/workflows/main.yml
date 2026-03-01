@@ -18,13 +18,13 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Build and Pack
+            - name: Build and Pack
         run: |
           # 1. Setup Workspace
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # 2. Compile the App
+          # 2. Compile the App with forced Header Search Paths
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -34,6 +34,7 @@ jobs:
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      FRAMEWORK_SEARCH_PATHS="./dependencies/ios" \
+                     HEADER_SEARCH_PATHS="/opt/homebrew/include" \
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
