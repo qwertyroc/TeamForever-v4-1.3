@@ -28,7 +28,19 @@ jobs:
           # 2. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
-
+      - name: Patch Source Code & Prepare Assets
+        run: |
+          # 1. Fix case-sensitivity include issue in RetroEngine.hpp
+          if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
+            sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
+          fi
+          
+          # 2. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
+          mkdir -p dependencies/ios
+          touch dependencies/ios/Data.rsdk
+          
+          # 3. Create missing build inputs to satisfy Xcode Compile Sources phase
+          touch ./RSDKv4/RetroGameLoop.cpp
       - name: Build iOS App
         run: |
           # --- DYNAMIC HEADER DISCOVERY ---
