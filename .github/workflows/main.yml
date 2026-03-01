@@ -117,6 +117,7 @@ jobs:
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           echo "=== 4. RUNNING XCODEBUILD ==="
+          # We added the missing Apple Frameworks to OTHER_LDFLAGS below!
           xcodebuild build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -133,7 +134,7 @@ jobs:
             LIBRARY_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
             OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error" \
-            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup -F$ROOT_DIR/dependencies/ios"
+            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup -F$ROOT_DIR/dependencies/ios -framework GameController -framework CoreHaptics -framework CoreMotion"
         shell: /bin/bash -e {0}
 
       - name: Package IPA
