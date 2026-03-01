@@ -20,18 +20,20 @@ jobs:
 
       - name: Configure Build Environment
         run: |
-          # Create an xcconfig to handle paths and bypass signing requirements
+          # Use // for comments in .xcconfig to avoid parsing errors
           cat <<EOF > ci.xcconfig
-          HEADER_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/include $(brew --prefix libvorbis)/include $(brew --prefix libogg)/include $(brew --prefix tinyxml2)/include
-          LIBRARY_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib
-          GCC_PREPROCESSOR_DEFINITIONS = \$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES
-          
-          # Force bypass signing in the config file itself
-          CODE_SIGNING_ALLOWED = NO
-          CODE_SIGNING_REQUIRED = NO
-          CODE_SIGN_IDENTITY = 
-          PROVISIONING_PROFILE_SPECIFIER = 
-          EOF
+// Header and Library Search Paths
+HEADER_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/include $(brew --prefix libvorbis)/include $(brew --prefix libogg)/include $(brew --prefix tinyxml2)/include
+LIBRARY_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib
+GCC_PREPROCESSOR_DEFINITIONS = \$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES
+
+// Force bypass all signing requirements for CI
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGN_IDENTITY = 
+PROVISIONING_PROFILE_SPECIFIER = 
+AD_HOC_CODE_SIGNING_ALLOWED = YES
+EOF
 
       - name: Install theoraplay
         run: |
@@ -42,12 +44,13 @@ jobs:
 
       - name: Build and Pack
         run: |
-          # 1. Ensure those missing resource files exist so the Copy phase doesn't crash
+          # 1. Prepare dummy resources to satisfy Xcode Copy Bundle Resources phase
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           touch dependencies/ios/Default.png
 
-          # 2. Build using the xcconfig and explicit bypass flags
+          # 2. Build the project
+          # We pass signing flags both in xcconfig and CLI to be absolutely certain
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -60,10 +63,15 @@ jobs:
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      build
 
-          # 3. Create the IPA (Payload folder)
+          # 3. Create the Payload directory for IPA packaging
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
-          if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
+          
+          if [ -z "$APP_DIR" ]; then 
+            echo "❌ Error: RSDKv4.app not found in build directory!"
+            exit 1
+          fi
+          
           cp -r "$APP_DIR" Payload/
           zip -r RSDKv4.ipa Payload
 
