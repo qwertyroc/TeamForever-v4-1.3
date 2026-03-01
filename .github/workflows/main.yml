@@ -27,7 +27,10 @@ jobs:
           for entity in "${entities[@]}"; do
             sed -i '' "s/.*CREATE_ENTITY($entity).*/#if 0\n    & \/\/ Disabled: Missing dependency\n#endif/" RSDKv4/Userdata.cpp
           done
-
+      - name: Create Dummy Data.rsdk
+        run: |
+          mkdir -p dependencies/ios
+          touch dependencies/ios/Data.rsdk
       - name: Build RSDKv4
         run: |
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
