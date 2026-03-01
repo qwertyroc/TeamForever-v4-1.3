@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C9065CCE25A3E2FF00382B94 /* cocoaHelpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C9065CCD25A3E2FF00382B94 /* cocoaHelpers.mm */; };
 		C9065CD125A3E50100382B94 /* Data.rsdk in Resources */ = {isa = PBXBuildFile; fileRef = C9065CD025A3E50000382B94 /* Data.rsdk */; };
 		C959D67E25A303DB0001CA1C /* libSDLMain.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C959D67D25A303C80001CA1C /* libSDLMain.a */; };
 		C968085526B8E8CE0083FF3D /* RetroEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C968084026B8E8CD0083FF3D /* RetroEngine.cpp */; };
