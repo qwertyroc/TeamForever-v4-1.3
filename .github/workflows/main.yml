@@ -135,3 +135,20 @@ jobs:
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
             OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
         shell: /bin/bash -e {0}
+      - name: Package IPA
+        run: |
+          # Create the required Payload directory structure
+          mkdir -p Payload
+          
+          # Move the compiled .app into the Payload folder
+          # (Adjust the path if your app is named differently in the build folder)
+          mv build/Build/Products/Release-iphoneos/RSDKv4.app Payload/
+          
+          # Zip the Payload folder into an .ipa file
+          zip -r RSDKv4.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RSDKv4-iOS
+          path: RSDKv4.ipa
