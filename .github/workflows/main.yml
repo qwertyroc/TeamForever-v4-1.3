@@ -70,13 +70,25 @@ jobs:
           ROOT_DIR=$(pwd)
           
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
-          LIBS="$ROOT_DIR/dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib"
+          LIBS="$ROOT_DIR/dependencies/ios"
           
-          # --- THE NEW LINKER FIX ---
-          # Create a dummy static library for SDLMain so the linker stops complaining
+          mkdir -p dependencies/ios
+          
+          # --- THE LINKER FIX ---
+          
+          # 1. Create a dummy static library for SDLMain
           echo "void dummy_sdlmain() {}" > dummy.c
-          clang -c dummy.c -o dummy.o
-          ar rcs $ROOT_DIR/dependencies/ios/libSDLMain.a dummy.o
+          clang -c dummy.c -target arm64-apple-ios13.0 -o dummy.o
+          ar rcs dependencies/ios/libSDLMain.a dummy.o
+          
+          # 2. Create dummy iOS Frameworks for Ogg, Vorbis, and SDL2
+          for fw in Ogg Vorbis SDL2; do
+            mkdir -p dependencies/ios/${fw}.framework
+            echo "void dummy_${fw}() {}" > dummy_${fw}.c
+            # Compile targeting iOS arm64 to prevent architecture mismatch warnings
+            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
+            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
+          done
           
           # Run xcodebuild
           xcodebuild clean build \
@@ -93,5 +105,5 @@ jobs:
             HEADER_SEARCH_PATHS="$HEADERS" \
             LIBRARY_SEARCH_PATHS="$LIBS" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error -H"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
         shell: /bin/bash -e {0}
