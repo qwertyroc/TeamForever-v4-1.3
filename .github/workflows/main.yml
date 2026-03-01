@@ -78,13 +78,6 @@ jobs:
             # Note: escaping parentheses for the find/sed command
             find . -type f \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '' "s/${old//\(/\\(}/ ${new//\(/\\(}/g" {} +
           done
-          
-          echo "Applying source code patches..."
-          for patch in "${patches[@]}"; do
-            IFS=":" read -r old new <<< "$patch"
-            echo "Replacing '$old' with '$new'..."
-            find . -type f \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '' "s/$old/$new/g" {} +
-          done
       - name: Build with xcodebuild
         run: |
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
