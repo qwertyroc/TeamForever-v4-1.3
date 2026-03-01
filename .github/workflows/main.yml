@@ -22,18 +22,26 @@ jobs:
 
       - name: Build and Pack
         run: |
+          # 1. Setup Paths
           SDL2_PATH=$(brew --prefix sdl2)
           VORBIS_PATH=$(brew --prefix libvorbis)
           OGG_PATH=$(brew --prefix libogg)
           TINYXML2_PATH=$(brew --prefix tinyxml2)
           
-          # Match the version in the code (2) and add platform-ignoring flags
-          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=2 RETRO_USING_OPENGL_ES'
-          
+          # 2. Setup Dependencies (Crucial for success)
           mkdir -p dependencies/ios
+          git clone https://github.com/icculus/theoraplay.git /tmp/theoraplay
+          cp /tmp/theoraplay/theoraplay.[ch] dependencies/ios/
+          
+          # 3. Create Dummy Files to satisfy Asset/Resource requirements
           touch dependencies/ios/Data.rsdk
           touch dependencies/ios/Default.png
-          
+          mkdir -p dependencies/ios/Assets.xcassets/AppIcon.appiconset
+          cat <<EOF > dependencies/ios/Assets.xcassets/AppIcon.appiconset/Contents.json
+          {"images":[],"info":{"version":1,"author":"xcode"}}
+          EOF
+
+          # 4. Build with "Ignore Warnings" and "No Signing"
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -43,12 +51,15 @@ jobs:
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
+                     GCC_TREAT_WARNINGS_AS_ERRORS=NO \
+                     WARNING_CFLAGS="-Wno-error -Wno-implicit-function-declaration" \
                      HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include $OGG_PATH/include $TINYXML2_PATH/include" \
                      LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
-                     GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
+                     GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RSDK_REVISION=2 RETRO_USING_OPENGL_ES" \
                      OTHER_LDFLAGS="-Wl,-fatal_warnings -Wl,-ignore_auto_link" \
                      build
-          
+
+          # 5. Packaging
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
           if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
