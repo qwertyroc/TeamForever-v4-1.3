@@ -23,6 +23,21 @@ jobs:
 
       - name: Build iOS App (All-in-One)
         run: |
+          echo "=== 0. EXTRACTING FRAMEWORKS ==="
+          mkdir -p dependencies/ios
+          cd dependencies/ios
+          
+          # Unzip the frameworks so the compiler can actually see them!
+          for fw in SDL2 Ogg Vorbis; do
+            if [ -f "${fw}.framework.zip" ]; then
+              echo "Extracting ${fw}.framework.zip..."
+              unzip -q -o "${fw}.framework.zip"
+            else
+              echo "::warning::${fw}.framework.zip not found. Make sure it is uploaded!"
+            fi
+          done
+          cd ../..
+
           echo "=== 1. GENERATING BYPASSES ==="
           
           # Fix case-sensitivity include issue
@@ -69,7 +84,7 @@ jobs:
           EOF
           fi
           
-          # Create Empty SDLMain to satisfy linker
+          # Create Empty SDLMain to satisfy linker without crashing the app
           echo "void dummy_empty_function() {}" > empty_main.c
           clang -c empty_main.c -target arm64-apple-ios13.0 -o empty_main.o
           ar rcs dependencies/ios/libSDLMain.a empty_main.o
@@ -130,5 +145,5 @@ jobs:
       - name: Upload Playable IPA
         uses: actions/upload-artifact@v4
         with:
-          name: RSDK4-iOS
+          name: RSDKv4-iOS
           path: RSDKv4.ipa
