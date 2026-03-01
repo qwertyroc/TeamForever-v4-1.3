@@ -21,6 +21,40 @@ jobs:
           brew update
           brew install sdl2 libvorbis libogg tinyxml2
 
+      - name: Verify and Auto-Fix Frameworks
+        run: |
+          echo "Checking dependencies/ios/ folder for real frameworks..."
+          mkdir -p dependencies/ios
+          
+          # Check for required frameworks
+          for fw in Ogg Vorbis SDL2; do
+            if [ ! -d "dependencies/ios/${fw}.framework" ]; then
+              echo "::error::MISSING: dependencies/ios/${fw}.framework is completely missing from your repo!"
+              echo "Please download the iOS version of ${fw} and upload it to your dependencies/ios/ folder."
+              exit 1
+            fi
+            
+            # If the folder exists but the binary inside is missing, Git might have corrupted the upload
+            if [ ! -f "dependencies/ios/${fw}.framework/${fw}" ]; then
+              echo "::warning::The actual binary inside ${fw}.framework seems to be missing or named incorrectly due to Git upload. Attempting auto-fix..."
+              # Attempt to find the actual binary file and rename it correctly
+              BINARY=$(find "dependencies/ios/${fw}.framework" -type f -maxdepth 1 | head -n 1)
+              if [ -n "$BINARY" ]; then
+                mv "$BINARY" "dependencies/ios/${fw}.framework/${fw}"
+                echo "Fixed corrupted framework binary name."
+              else
+                echo "::error::${fw}.framework is an empty folder. You must re-upload the framework properly."
+                exit 1
+              fi
+            fi
+            
+            # Ensure the linker has permission to read the framework binary
+            chmod +x "dependencies/ios/${fw}.framework/${fw}"
+          done
+          
+          echo "All frameworks are present and ready!"
+        shell: /bin/bash -e {0}
+
       - name: Generate Bypasses (No Xcode Needed)
         run: |
           # 1. Fix case-sensitivity include issue in RetroEngine.hpp
@@ -60,10 +94,13 @@ jobs:
           EOF
           fi
           
-          # 5. CREATE EMPTY SDLMAIN TO SATISFY LINKER (Without crashing the app!)
+          # 5. CREATE EMPTY SDLMAIN TO SATISFY LINKER
           echo "void dummy_empty_function() {}" > empty_main.c
           clang -c empty_main.c -target arm64-apple-ios13.0 -o empty_main.o
           ar rcs dependencies/ios/libSDLMain.a empty_main.o
+          
+          # 6. Remove the legacy SDLMain requirement from the Xcode project file
+          sed -i '' 's/-lSDLMain//g' "RSDKv4 ios.xcodeproj/project.pbxproj"
         shell: /bin/bash -e {0}
 
       - name: Build iOS App
@@ -83,7 +120,7 @@ jobs:
           NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
           NATIVE_DIR=$(dirname "$NATIVE_PATH")
           
-          # Construct Paths (Linking to your uploaded framework headers)
+          # Construct Paths
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           # Run xcodebuild
