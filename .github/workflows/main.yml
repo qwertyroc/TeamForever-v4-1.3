@@ -37,6 +37,7 @@ jobs:
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
                      build
 
+
       - name: Pack IPA
         if: always()
         run: |
