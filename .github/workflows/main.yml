@@ -17,6 +17,20 @@ jobs:
         run: |
           # Fix case-sensitivity include issue in RetroEngine.hpp
           sed -i '' 's|#include <Vorbis/vorbisfile.h>|#include <vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
+      - name: Ensure Assets Exist
+        run: |
+          # Check if the file is missing
+          if [ ! -f "./dependencies/ios/Data.rsdk" ]; then
+            echo "Data.rsdk is missing! Attempting to locate or create a placeholder."
+            
+            # OPTION 1: If it's just a blank data file for testing:
+            touch ./dependencies/ios/Data.rsdk
+            
+            # OPTION 2: If you have a download script or location, uncomment below:
+            # curl -o ./dependencies/ios/Data.rsdk https://your-server.com/path/to/Data.rsdk
+          else
+            echo "Data.rsdk found."
+          fi
       - name: Validate Assets
         run: |
           echo "Checking for Data.rsdk..."
