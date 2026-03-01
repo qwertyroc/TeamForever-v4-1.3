@@ -13,8 +13,8 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Install SDL2
-        run: brew install sdl2
+      - name: Install Dependencies
+  run: brew install sdl2 libvorbis
 
       - name: Build and Pack
         run: |
