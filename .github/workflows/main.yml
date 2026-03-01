@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build RSDKv4 iOS
+    name: Build Playable RSDKv4 iOS
     runs-on: macos-latest 
 
     steps:
@@ -19,27 +19,29 @@ jobs:
       - name: Install Build Tools
         run: |
           brew update
-          # Brought back sdl2 and vorbis so we can safely use their headers!
           brew install sdl2 libvorbis libogg tinyxml2
 
-      - name: Generate Dummy Files & Bypasses
+      - name: Patch Xcode Project (No Xcode Needed)
         run: |
-          echo "Generating files to bypass Xcode requirements..."
+          echo "Patching Xcode project to remove broken references..."
           
-          # 1. Fix case-sensitivity include issue in RetroEngine.hpp
+          # 1. Remove the legacy SDLMain requirement from the Xcode project file
+          sed -i '' 's/-lSDLMain//g' "RSDKv4 ios.xcodeproj/project.pbxproj"
+          
+          # 2. Fix case-sensitivity include issue in RetroEngine.hpp
           if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
             sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
           fi
           
-          # 2. Create missing C++ files so the compiler doesn't crash
+          # 3. Create missing C++ files (WARNING: If your game needs these to run, you MUST upload the real ones to your repo!)
           touch ./RSDKv4/RetroGameLoop.cpp
           touch ./RSDKv4/PauseMenu.cpp
           
-          # 3. Create the dummy Data.rsdk game file
+          # 4. Create the dummy Data.rsdk game file (You will add the real one via the iOS Files App later)
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # 4. Generate a valid Info.plist ID card for the app
+          # 5. Generate a valid Info.plist ID card for the app
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -62,34 +64,13 @@ jobs:
           </plist>
           EOF
           fi
-          
-          # Get iOS SDK path to suppress clang warnings
-          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          
-          # 5. Create a dummy main() function so the Linker doesn't crash
-          echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
-          clang -c dummy_main.c -isysroot $IOS_SDK -target arm64-apple-ios13.0 -o dummy_main.o
-          ar rcs dependencies/ios/libSDLMain.a dummy_main.o
-          
-          # 6. Create dummy iOS Frameworks ONLY if the real ones are missing
-          for fw in Ogg Vorbis SDL2; do
-            if [ ! -d "dependencies/ios/${fw}.framework" ] || [ ! -f "dependencies/ios/${fw}.framework/${fw}" ]; then
-              echo "Missing ${fw}, creating dummy framework..."
-              mkdir -p dependencies/ios/${fw}.framework
-              echo "void dummy_${fw}() {}" > dummy_${fw}.c
-              clang -c dummy_${fw}.c -isysroot $IOS_SDK -target arm64-apple-ios13.0 -o dummy_${fw}.o
-              ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
-            else
-              echo "Real ${fw}.framework found! Skipping dummy creation."
-            fi
-          done
         shell: /bin/bash -e {0}
 
       - name: Build iOS App
         run: |
           ROOT_DIR=$(pwd)
           
-          # Define paths using brew (We NEED these for the Headers!)
+          # Define Homebrew paths for Headers
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
@@ -102,10 +83,10 @@ jobs:
           NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
           NATIVE_DIR=$(dirname "$NATIVE_PATH")
           
-          # Construct Paths (Restored Homebrew header paths)
+          # Construct Paths
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
-          # Run xcodebuild
+          # Run xcodebuild using the REAL frameworks you uploaded
           xcodebuild build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -121,8 +102,7 @@ jobs:
             FRAMEWORK_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             LIBRARY_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error" \
-            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
         shell: /bin/bash -e {0}
 
       - name: Package IPA
