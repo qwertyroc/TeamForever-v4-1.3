@@ -37,6 +37,10 @@ jobs:
           ls -l ./dependencies/ios/Data.rsdk || echo "Data.rsdk is missing!"
           echo "Listing contents of dependencies/ios/ to see what is there:"
           ls -R ./dependencies/ios/
+      - name: Locate Header
+        run: |
+          echo "Searching for theoraplay.h..."
+          find . -name "theoraplay.h"
       - name: Build Project
         run: |
           # Define paths using brew
