@@ -48,41 +48,35 @@ jobs:
       - name: Build iOS App
         run: |
           # --- DYNAMIC HEADER DISCOVERY ---
-          
-          # Find theoraplay.h and get its absolute directory
           THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
           if [ -n "$THEORA_PATH" ]; then
             THEORA_DIR=$(cd "$(dirname "$THEORA_PATH")" && pwd)
-            echo "Found theoraplay in: $THEORA_DIR"
           else
-            echo "ERROR: theoraplay.h not found anywhere in the repository!"
             THEORA_DIR=""
           fi
           
-          # Find NativeObjects.hpp and get its absolute directory
           NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
           if [ -n "$NATIVE_PATH" ]; then
             NATIVE_DIR=$(cd "$(dirname "$NATIVE_PATH")" && pwd)
-            echo "Found NativeObjects in: $NATIVE_DIR"
           else
-            echo "WARNING: NativeObjects.hpp not found! Your repo might be missing game object files."
             NATIVE_DIR=""
           fi
 
           # --- BUILD CONFIGURATION ---
-
-          # Define paths using brew
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
           TINYXML_INC=$(brew --prefix tinyxml2)/include
           ROOT_DIR=$(pwd)
           
-          # Construct Header Search Paths using our dynamically found directories
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
-          
-          # Construct Library Search Paths
           LIBS="$ROOT_DIR/dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib"
+          
+          # --- THE NEW LINKER FIX ---
+          # Create a dummy static library for SDLMain so the linker stops complaining
+          echo "void dummy_sdlmain() {}" > dummy.c
+          clang -c dummy.c -o dummy.o
+          ar rcs $ROOT_DIR/dependencies/ios/libSDLMain.a dummy.o
           
           # Run xcodebuild
           xcodebuild clean build \
@@ -99,5 +93,5 @@ jobs:
             HEADER_SEARCH_PATHS="$HEADERS" \
             LIBRARY_SEARCH_PATHS="$LIBS" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error -H"
         shell: /bin/bash -e {0}
