@@ -20,12 +20,11 @@ jobs:
 
       - name: Build and Pack
         run: |
-          # 1. Setup Workspace & Install Dependencies
-          brew install sdl2 libvorbis libogg
+          # 1. Setup Workspace (Skip brew, it's causing the mismatch)
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # 2. Compile with Absolute Search Paths
+          # 2. Compile using internal frameworks ONLY
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -35,8 +34,6 @@ jobs:
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      FRAMEWORK_SEARCH_PATHS="./dependencies/ios" \
-                     HEADER_SEARCH_PATHS="/opt/homebrew/include /opt/homebrew/include/SDL2" \
-                     USER_HEADER_SEARCH_PATHS="/opt/homebrew/include /opt/homebrew/include/SDL2" \
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
