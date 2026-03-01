@@ -1,10 +1,7 @@
 name: iOS RSDK Build
 on:
   push:
-    branches: [ "main" ]  # fix branch name
   pull_request:
-    branches: [ "main" ]  # fix branch name
-
 jobs:
   build:
     name: Build RSDKv4 for iOS
