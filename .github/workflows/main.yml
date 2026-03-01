@@ -5,53 +5,70 @@ on: [push, pull_request]
 jobs:
   build:
     name: Build RSDKv4 iOS
-    # macos-latest currently defaults to a runner that supports newer Xcode versions
     runs-on: macos-latest 
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Ensures theoraplay and other submodules are fetched if applicable
+          submodules: recursive
 
       - name: Install Dependencies
         run: |
           brew update
           brew install sdl2 libvorbis libogg tinyxml2
 
-      - name: Locate theoraplay.h (Diagnostic)
+      - name: Patch Source Code & Prepare Assets
         run: |
-          echo "Searching for theoraplay.h in the repository..."
-          find . -name "theoraplay.h"
-      - name: List files in dependencies/ios
-        run: ls -R dependencies/ios
-      - name: Checkout LFS
-        run: git lfs pull
-      - name: Build iOS App
-        run: |
-          # 1. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
+          # 1. Fix case-sensitivity include issue in RetroEngine.hpp
+          if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
+            sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
+          fi
+          
+          # 2. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
 
-          # 2. Define paths using brew
+      - name: Build iOS App
+        run: |
+          # --- DYNAMIC HEADER DISCOVERY ---
+          
+          # Find theoraplay.h and get its absolute directory
+          THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
+          if [ -n "$THEORA_PATH" ]; then
+            THEORA_DIR=$(cd "$(dirname "$THEORA_PATH")" && pwd)
+            echo "Found theoraplay in: $THEORA_DIR"
+          else
+            echo "ERROR: theoraplay.h not found anywhere in the repository!"
+            THEORA_DIR=""
+          fi
+          
+          # Find NativeObjects.hpp and get its absolute directory
+          NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
+          if [ -n "$NATIVE_PATH" ]; then
+            NATIVE_DIR=$(cd "$(dirname "$NATIVE_PATH")" && pwd)
+            echo "Found NativeObjects in: $NATIVE_DIR"
+          else
+            echo "WARNING: NativeObjects.hpp not found! Your repo might be missing game object files."
+            NATIVE_DIR=""
+          fi
+
+          # --- BUILD CONFIGURATION ---
+
+          # Define paths using brew
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
           TINYXML_INC=$(brew --prefix tinyxml2)/include
-          
-          # Use absolute path for the workspace root
           ROOT_DIR=$(pwd)
           
-          # 3. Construct Header Search Paths
-          # CRITICAL FIX: Updated theoraplay path to dependencies/all/theoraplay
-          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/dependencies/all/theoraplay $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          # Construct Header Search Paths using our dynamically found directories
+          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           # Construct Library Search Paths
           LIBS="$ROOT_DIR/dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib"
           
-          echo "Using Header Search Paths: $HEADERS"
-          
-          # 4. Run xcodebuild
+          # Run xcodebuild
           xcodebuild clean build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -67,3 +84,4 @@ jobs:
             LIBRARY_SEARCH_PATHS="$LIBS" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
             OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
+        shell: /bin/bash -e {0}
