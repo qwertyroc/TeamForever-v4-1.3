@@ -1,59 +1,24 @@
 name: iOS RSDK Build
+
 on:
   push:
   pull_request:
+
 jobs:
   build:
     name: Build RSDKv4 for iOS
     runs-on: macos-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Install Dependencies
-        run: brew install sdl2 libogg libvorbis tinyxml2
-
-      - name: Install theoraplay
+      - name: Clean and Install Dependencies
         run: |
-          git clone https://github.com/icculus/theoraplay.git /tmp/theoraplay
-          mkdir -p dependencies/ios
-          cp /tmp/theoraplay/theoraplay.h dependencies/ios/theoraplay.h
-          cp /tmp/theoraplay/theoraplay.c dependencies/ios/theoraplay.c
-
-      - name: Patch source code issues
-        run: |
-          # Fix REGION_JP → RETRO_JP typo in RetroEngine.hpp
-          sed -i '' 's/= REGION_JP/= RETRO_JP/g' RSDKv4/RetroEngine.hpp
-
-      - name: Create NativeObjects stub
-        run: |
-          mkdir -p dependencies/ios
-          if [ ! -f "dependencies/ios/NativeObjects.hpp" ] && [ ! -f "RSDKv4/NativeObjects.hpp" ]; then
-            cat > dependencies/ios/NativeObjects.hpp << 'STUB'
-          #pragma once
-          // Stub NativeObjects.hpp for CI build
-
-          // Forward declarations for native iOS game objects
-          struct AchievementsMenu {
-              static int classID;
-          };
-
-          struct RetroGameLoop {
-              static int classID;
-          };
-
-          struct VirtualDPad {
-              static int classID;
-          };
-
-          struct MultiplayerHandler {
-              static int classID;
-          };
-          STUB
-          fi
+          rm -rf build/ Payload/ *.ipa  # Clean up previous failed runs
+          brew install sdl2 libogg libvorbis tinyxml2
 
       - name: Build and Pack
         run: |
@@ -61,12 +26,14 @@ jobs:
           VORBIS_PATH=$(brew --prefix libvorbis)
           OGG_PATH=$(brew --prefix libogg)
           TINYXML2_PATH=$(brew --prefix tinyxml2)
-          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES'
-
+          
+          # Match the version in the code (2) and add platform-ignoring flags
+          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=2 RETRO_USING_OPENGL_ES'
+          
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           touch dependencies/ios/Default.png
-
+          
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -76,18 +43,17 @@ jobs:
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
-                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
                      HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include $OGG_PATH/include $TINYXML2_PATH/include" \
                      LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
                      GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
-                     EXCLUDED_SOURCE_FILE_NAMES="*/dependencies/mac/* dependencies/mac/*" \
+                     OTHER_LDFLAGS="-Wl,-fatal_warnings -Wl,-ignore_auto_link" \
                      build
-
+          
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
           if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
           cp -r "$APP_DIR" Payload/
-
+          
           SHORT_SHA=$(git rev-parse --short HEAD)
           IPA_NAME="RSDKv4-Build-${SHORT_SHA}.ipa"
           zip -r "$IPA_NAME" Payload
@@ -98,4 +64,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RSDKv4-iOS-Package
-          path: "*.ipa"
+          path: ${{ env.IPA_FILENAME }}
