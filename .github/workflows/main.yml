@@ -21,37 +21,24 @@ jobs:
           brew update
           brew install sdl2 libvorbis libogg tinyxml2
 
-      - name: Verify and Auto-Fix Frameworks
+      - name: Build iOS App (All-in-One)
         run: |
-          cd dependencies/ios
-          # If you uploaded a zip, extract it
-          if [ -f "SDL2.framework.zip" ]; then
-            unzip -o SDL2.framework.zip
-          fi
-          cd ../..
+          echo "=== 1. GENERATING BYPASSES ==="
           
-          # ... rest of the existing verify script ...
-      - name: Generate Bypasses and Extract Frameworks
-        run: |
-          echo "Extracting real frameworks and generating bypasses..."
-          
-          # 1. Extract Zipped Frameworks
-          cd dependencies/ios
-          if [ -f "SDL2.framework.zip" ]; then unzip -o SDL2.framework.zip; fi
-          if [ -f "Ogg.framework.zip" ]; then unzip -o Ogg.framework.zip; fi
-          if [ -f "Vorbis.framework.zip" ]; then unzip -o Vorbis.framework.zip; fi
-          cd ../..
-
-          # 2. Fix case-sensitivity include issue in RetroEngine.hpp
+          # Fix case-sensitivity include issue
           if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
             sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
           fi
           
-
-          # 3. Create the dummy Data.rsdk (The app will use your real one from Files app)
+          # Create missing C++ files so the compiler doesn't crash
+          touch ./RSDKv4/RetroGameLoop.cpp
+          touch ./RSDKv4/PauseMenu.cpp
+          
+          # Create the dummy Data.rsdk game file 
+          mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # 4. Create valid Info.plist
+          # Generate Info.plist if missing
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -63,50 +50,51 @@ jobs:
               <key>CFBundleIdentifier</key>
               <string>com.roctg.rsdk</string>
               <key>CFBundleName</key>
-              <string>RSDK4</string>
+              <string>RSDKV4</string>
               <key>CFBundleShortVersionString</key>
               <string>1.0</string>
               <key>CFBundleVersion</key>
               <string>1</string>
-              <key>UIFileSharingEnabled</key>
-              <true/>
-              <key>LSSupportsOpeningDocumentsInPlace</key>
+              <key>UIRequiresFullScreen</key>
               <true/>
           </dict>
           </plist>
           EOF
           fi
           
-          # 5. Create Empty SDLMain to satisfy linker
+          # Create Empty SDLMain to satisfy linker
           echo "void dummy_empty_function() {}" > empty_main.c
           clang -c empty_main.c -target arm64-apple-ios13.0 -o empty_main.o
           ar rcs dependencies/ios/libSDLMain.a empty_main.o
           
-          # 6. Remove legacy SDLMain flag
+          # Remove legacy SDLMain flag from Xcode project
           sed -i '' 's/-lSDLMain//g' "RSDKv4 ios.xcodeproj/project.pbxproj"
-        shell: /bin/bash -e {0}
 
-      - name: Build iOS App
-        run: |
+          echo "=== 2. FIXING BROKEN SYMLINKS ==="
+          # Windows/Git breaks Apple framework symlinks. This flattens them to fix the Invalid Argument warning.
+          for fw in dependencies/ios/*.framework; do
+            if [ -d "$fw/Versions/A" ]; then
+              cp -r "$fw/Versions/A/"* "$fw/" 2>/dev/null || true
+            fi
+          done
+
+          echo "=== 3. CONFIGURING PATHS ==="
           ROOT_DIR=$(pwd)
           
-          # Define Homebrew paths for Headers
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
           TINYXML_INC=$(brew --prefix tinyxml2)/include
           
-          # Locate headers dynamically
           THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
           THEORA_DIR=$(dirname "$THEORA_PATH")
           
           NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
           NATIVE_DIR=$(dirname "$NATIVE_PATH")
           
-          # Construct Paths
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
-          # Run xcodebuild
+          echo "=== 4. RUNNING XCODEBUILD ==="
           xcodebuild build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -135,5 +123,7 @@ jobs:
       - name: Upload Playable IPA
         uses: actions/upload-artifact@v4
         with:
+          name: rsdkv4-iOS
+          path: RSDKv4.ipa
           name: RSDK4-iOS
           path: RSDKv4.ipa
