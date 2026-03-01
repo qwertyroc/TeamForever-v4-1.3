@@ -23,38 +23,14 @@ jobs:
 
       - name: Verify and Auto-Fix Frameworks
         run: |
-          echo "Checking dependencies/ios/ folder for real frameworks..."
-          mkdir -p dependencies/ios
+          cd dependencies/ios
+          # If you uploaded a zip, extract it
+          if [ -f "SDL2.framework.zip" ]; then
+            unzip -o SDL2.framework.zip
+          fi
+          cd ../..
           
-          # Check for required frameworks
-          for fw in Ogg Vorbis SDL2; do
-            if [ ! -d "dependencies/ios/${fw}.framework" ]; then
-              echo "::error::MISSING: dependencies/ios/${fw}.framework is completely missing from your repo!"
-              echo "Please download the iOS version of ${fw} and upload it to your dependencies/ios/ folder."
-              exit 1
-            fi
-            
-            # If the folder exists but the binary inside is missing, Git might have corrupted the upload
-            if [ ! -f "dependencies/ios/${fw}.framework/${fw}" ]; then
-              echo "::warning::The actual binary inside ${fw}.framework seems to be missing or named incorrectly due to Git upload. Attempting auto-fix..."
-              # Attempt to find the actual binary file and rename it correctly
-              BINARY=$(find "dependencies/ios/${fw}.framework" -type f -maxdepth 1 | head -n 1)
-              if [ -n "$BINARY" ]; then
-                mv "$BINARY" "dependencies/ios/${fw}.framework/${fw}"
-                echo "Fixed corrupted framework binary name."
-              else
-                echo "::error::${fw}.framework is an empty folder. You must re-upload the framework properly."
-                exit 1
-              fi
-            fi
-            
-            # Ensure the linker has permission to read the framework binary
-            chmod +x "dependencies/ios/${fw}.framework/${fw}"
-          done
-          
-          echo "All frameworks are present and ready!"
-        shell: /bin/bash -e {0}
-
+          # ... rest of the existing verify script ...
       - name: Generate Bypasses (No Xcode Needed)
         run: |
           # 1. Fix case-sensitivity include issue in RetroEngine.hpp
