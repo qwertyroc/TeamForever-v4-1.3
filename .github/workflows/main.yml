@@ -23,14 +23,35 @@ jobs:
           cp /tmp/theoraplay/theoraplay.h dependencies/ios/theoraplay.h
           cp /tmp/theoraplay/theoraplay.c dependencies/ios/theoraplay.c
 
+      - name: Patch source code issues
+        run: |
+          # Fix REGION_JP → RETRO_JP typo in RetroEngine.hpp
+          sed -i '' 's/= REGION_JP/= RETRO_JP/g' RSDKv4/RetroEngine.hpp
+
       - name: Create NativeObjects stub
         run: |
           mkdir -p dependencies/ios
-          # Only create the stub if NativeObjects.hpp doesn't already exist in the repo
           if [ ! -f "dependencies/ios/NativeObjects.hpp" ] && [ ! -f "RSDKv4/NativeObjects.hpp" ]; then
             cat > dependencies/ios/NativeObjects.hpp << 'STUB'
           #pragma once
           // Stub NativeObjects.hpp for CI build
+
+          // Forward declarations for native iOS game objects
+          struct AchievementsMenu {
+              static int classID;
+          };
+
+          struct RetroGameLoop {
+              static int classID;
+          };
+
+          struct VirtualDPad {
+              static int classID;
+          };
+
+          struct MultiplayerHandler {
+              static int classID;
+          };
           STUB
           fi
 
