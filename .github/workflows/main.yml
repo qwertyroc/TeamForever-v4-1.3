@@ -12,9 +12,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
+      - name: Install SDL2
+  run: brew install sdl2
+      
       - name: Build and Pack
-        run: |
+  run: |
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
 
