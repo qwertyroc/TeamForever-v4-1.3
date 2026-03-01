@@ -62,6 +62,22 @@ jobs:
             NATIVE_DIR=""
           fi
 
+          # --- LINKER FIXES ---
+          # 1. Provide a dummy main() because SDL redefines yours to SDL_main
+          echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
+          clang -c dummy_main.c -target arm64-apple-ios13.0 -o dummy_main.o
+          
+          # 2. Create dummy frameworks/libraries to satisfy Xcode's Link Binary phase
+          mkdir -p dependencies/ios
+          ar rcs dependencies/ios/libSDLMain.a dummy_main.o
+          
+          for fw in Ogg Vorbis SDL2; do
+            mkdir -p dependencies/ios/${fw}.framework
+            echo "void dummy_${fw}() {}" > dummy_${fw}.c
+            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
+            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
+          done
+
           # --- BUILD CONFIGURATION ---
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
@@ -70,25 +86,6 @@ jobs:
           ROOT_DIR=$(pwd)
           
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
-          LIBS="$ROOT_DIR/dependencies/ios"
-          
-          mkdir -p dependencies/ios
-          
-          # --- THE LINKER FIX ---
-          
-          # 1. Create a dummy static library for SDLMain
-          echo "void dummy_sdlmain() {}" > dummy.c
-          clang -c dummy.c -target arm64-apple-ios13.0 -o dummy.o
-          ar rcs dependencies/ios/libSDLMain.a dummy.o
-          
-          # 2. Create dummy iOS Frameworks for Ogg, Vorbis, and SDL2
-          for fw in Ogg Vorbis SDL2; do
-            mkdir -p dependencies/ios/${fw}.framework
-            echo "void dummy_${fw}() {}" > dummy_${fw}.c
-            # Compile targeting iOS arm64 to prevent architecture mismatch warnings
-            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
-            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
-          done
           
           # Run xcodebuild
           xcodebuild clean build \
@@ -103,7 +100,9 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             HEADER_SEARCH_PATHS="$HEADERS" \
-            LIBRARY_SEARCH_PATHS="$LIBS" \
+            FRAMEWORK_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
+            LIBRARY_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error" \
+            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup $ROOT_DIR/dummy_main.o"
         shell: /bin/bash -e {0}
