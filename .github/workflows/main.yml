@@ -16,6 +16,12 @@ jobs:
       - name: Install Dependencies
         run: brew install sdl2 libogg libvorbis tinyxml2
 
+      - name: Install theoraplay
+        run: |
+          git clone https://github.com/icculus/theoraplay.git /tmp/theoraplay
+          cp /tmp/theoraplay/theoraplay.h dependencies/ios/theoraplay.h
+          cp /tmp/theoraplay/theoraplay.c dependencies/ios/theoraplay.c
+
       - name: Build and Pack
         run: |
           SDL2_PATH=$(brew --prefix sdl2)
