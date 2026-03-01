@@ -1,15 +1,13 @@
 name: iOS RSDK Build
-
 on:
   push:
   pull_request:
-
 jobs:
   build:
     name: Build RSDKv4 for iOS
     runs-on: macos-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -17,23 +15,6 @@ jobs:
 
       - name: Install Dependencies
         run: brew install sdl2 libogg libvorbis tinyxml2
-
-      - name: Configure Build Environment
-        run: |
-          # Ensure every line below this is indented by at least 10 spaces
-          cat <<EOF > ci.xcconfig
-          // Header and Library Search Paths
-          HEADER_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/include $(brew --prefix libvorbis)/include $(brew --prefix libogg)/include $(brew --prefix tinyxml2)/include
-          LIBRARY_SEARCH_PATHS = \$(inherited) ./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib
-          GCC_PREPROCESSOR_DEFINITIONS = \$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES
-
-          // Force bypass all signing requirements for CI
-          CODE_SIGNING_ALLOWED = NO
-          CODE_SIGNING_REQUIRED = NO
-          CODE_SIGN_IDENTITY = 
-          PROVISIONING_PROFILE_SPECIFIER = 
-          AD_HOC_CODE_SIGNING_ALLOWED = YES
-          EOF
 
       - name: Install theoraplay
         run: |
@@ -44,41 +25,40 @@ jobs:
 
       - name: Build and Pack
         run: |
-          # 1. Prepare dummy resources
+          SDL2_PATH=$(brew --prefix sdl2)
+          VORBIS_PATH=$(brew --prefix libvorbis)
+          OGG_PATH=$(brew --prefix libogg)
+          TINYXML2_PATH=$(brew --prefix tinyxml2)
+          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES'
+
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           touch dependencies/ios/Default.png
 
-          # 2. Build the project
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
                      -configuration Release \
                      -derivedDataPath ./build \
-                     -xcconfig ci.xcconfig \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
+                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
+                     HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include $OGG_PATH/include $TINYXML2_PATH/include" \
+                     LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib $TINYXML2_PATH/lib" \
+                     GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
+                     EXCLUDED_SOURCE_FILE_NAMES="*/dependencies/mac/* dependencies/mac/*" \
                      build
 
-          # 3. Create the Payload directory for IPA packaging
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
-          
-          if [ -z "$APP_DIR" ]; then 
-            echo "❌ Error: RSDKv4.app not found!"
-            exit 1
-          fi
-          
+          if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
           cp -r "$APP_DIR" Payload/
-          
-          # 4. Generate filename with commit hash (Short version)
+
           SHORT_SHA=$(git rev-parse --short HEAD)
           IPA_NAME="RSDKv4-Build-${SHORT_SHA}.ipa"
           zip -r "$IPA_NAME" Payload
-          
-          # Pass the name to the next step
           echo "IPA_FILENAME=$IPA_NAME" >> $GITHUB_ENV
 
       - name: Upload Artifact
@@ -86,4 +66,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RSDKv4-iOS-Package
-          path:
+          path: "*.ipa"
