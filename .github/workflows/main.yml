@@ -25,7 +25,10 @@ jobs:
           # Create a dummy file if it's missing, or ensure the real one is here
           touch dependencies/ios/Data.rsdk
           touch dependencies/ios/Default.png
-
+      - name: Debug Header Location
+        run: |
+          echo "Looking for theoraplay.h..."
+          find . -name "theoraplay.h"
       - name: Build Project
         run: |
           # Update this path to the ACTUAL directory where theoraplay.h resides
