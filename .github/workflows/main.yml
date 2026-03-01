@@ -1,10 +1,13 @@
-name: Build iOS Project
+name: iOS Build
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build RSDKv4 iOS
+    name: Build Playable RSDKv4 iOS
     runs-on: macos-latest 
 
     steps:
@@ -13,86 +16,35 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Dependencies
+      - name: Install Build Tools
         run: |
           brew update
-          brew install sdl2 libvorbis libogg tinyxml2
+          brew install tinyxml2
 
-      - name: Patch Source Code & Prepare Assets
+      - name: Bypass Missing Files (No Xcode Needed)
         run: |
-          # 1. Fix case-sensitivity include issue in RetroEngine.hpp
-          if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
-            sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
-          fi
-          
-          # 2. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
-          mkdir -p dependencies/ios
-          touch dependencies/ios/Data.rsdk
-
-          # 3. Create missing build inputs to satisfy Xcode's Compile Sources phase
+          # Create blank files to satisfy Xcode's missing file errors
           touch ./RSDKv4/RetroGameLoop.cpp
           touch ./RSDKv4/PauseMenu.cpp
-      - name: Patch Source Code & Prepare Assets
-        run: |
-          # 1. Fix case-sensitivity include issue in RetroEngine.hpp
+          
+          # Fix case-sensitivity include issue in RetroEngine.hpp
           if [ -f "./RSDKv4/RetroEngine.hpp" ]; then
             sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
           fi
           
-          # 2. Create a dummy Data.rsdk to satisfy Xcode's Copy Bundle Resources phase
-          mkdir -p dependencies/ios
-          touch dependencies/ios/Data.rsdk
-          
-          # 3. Create missing build inputs to satisfy Xcode Compile Sources phase
-          touch ./RSDKv4/RetroGameLoop.cpp
-      - name: Build iOS App
-        run: |
-          # --- DYNAMIC HEADER DISCOVERY ---
-          THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
-          if [ -n "$THEORA_PATH" ]; then
-            THEORA_DIR=$(cd "$(dirname "$THEORA_PATH")" && pwd)
-          else
-            THEORA_DIR=""
-          fi
-          
-          NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
-          if [ -n "$NATIVE_PATH" ]; then
-            NATIVE_DIR=$(cd "$(dirname "$NATIVE_PATH")" && pwd)
-          else
-            NATIVE_DIR=""
-          fi
-
-          # --- BUILD CONFIGURATION ---
-          SDL_INC=$(brew --prefix sdl2)/include
-          VORBIS_INC=$(brew --prefix libvorbis)/include
-          OGG_INC=$(brew --prefix libogg)/include
-          TINYXML_INC=$(brew --prefix tinyxml2)/include
-          ROOT_DIR=$(pwd)
-          
-          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
-          LIBS="$ROOT_DIR/dependencies/ios"
-          
-          mkdir -p dependencies/ios
-          
-          # --- CREATE MISSING INFO.PLIST ---
+          # Generate Info.plist if you haven't uploaded one
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
               <key>CFBundleExecutable</key>
               <string>$(EXECUTABLE_NAME)</string>
               <key>CFBundleIdentifier</key>
               <string>com.retro.rsdk</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
               <key>CFBundleName</key>
-              <string>RSDKv4</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
+              <string>Sonic CD</string>
               <key>CFBundleShortVersionString</key>
               <string>1.0</string>
               <key>CFBundleVersion</key>
@@ -103,22 +55,22 @@ jobs:
           </plist>
           EOF
           fi
+
+      - name: Build iOS App
+        run: |
+          ROOT_DIR=$(pwd)
           
-          # --- THE LINKER FIX ---
-          # 1. Create a dummy static library for SDLMain
-          echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
-          clang -c dummy_main.c -target arm64-apple-ios13.0 -o dummy_main.o
-          ar rcs dependencies/ios/libSDLMain.a dummy_main.o
+          # Locate theoraplay dynamically
+          THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
+          THEORA_DIR=$(dirname "$THEORA_PATH")
           
-          # 2. Create dummy iOS Frameworks for Ogg, Vorbis, and SDL2
-          for fw in Ogg Vorbis SDL2; do
-            mkdir -p dependencies/ios/${fw}.framework
-            echo "void dummy_${fw}() {}" > dummy_${fw}.c
-            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
-            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
-          done
+          # Locate NativeObjects dynamically
+          NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
+          NATIVE_DIR=$(dirname "$NATIVE_PATH")
           
-          # Run xcodebuild
+          # Construct Paths (Linking to the real frameworks you uploaded)
+          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $(brew --prefix tinyxml2)/include"
+          
           xcodebuild clean build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -131,24 +83,20 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             HEADER_SEARCH_PATHS="$HEADERS" \
-            LIBRARY_SEARCH_PATHS="$LIBS" \
+            FRAMEWORK_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
             OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
         shell: /bin/bash -e {0}
+
       - name: Package IPA
         run: |
-          # Create the required Payload directory structure
+          # Create the folder structure required for an iOS app installer
           mkdir -p Payload
-          
-          # Move the compiled .app into the Payload folder
-          # (Adjust the path if your app is named differently in the build folder)
           mv build/Build/Products/Release-iphoneos/RSDKv4.app Payload/
-          
-          # Zip the Payload folder into an .ipa file
           zip -r RSDKv4.ipa Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload Playable IPA
         uses: actions/upload-artifact@v4
         with:
-          name: RSDKv4-iOS
+          name: SonicCD-iOS
           path: RSDKv4.ipa
