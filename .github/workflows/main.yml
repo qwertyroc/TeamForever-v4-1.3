@@ -42,15 +42,16 @@ jobs:
           # Use absolute path for the workspace root
           ROOT_DIR=$(pwd)
           
-          # Construct Header Search Paths using absolute paths
-          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/theoraplay/src $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          # 3. Construct Header Search Paths
+          # CRITICAL FIX: Updated theoraplay path to dependencies/all/theoraplay
+          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/dependencies/all/theoraplay $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
-          # Construct Library Search Paths using absolute paths
+          # Construct Library Search Paths
           LIBS="$ROOT_DIR/dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib"
           
           echo "Using Header Search Paths: $HEADERS"
           
-          # 3. Run xcodebuild
+          # 4. Run xcodebuild
           xcodebuild clean build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
