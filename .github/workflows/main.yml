@@ -35,7 +35,9 @@ jobs:
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      FRAMEWORK_SEARCH_PATHS="./dependencies/ios" \
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
+                     EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
+
 
 
       - name: Pack IPA
