@@ -19,7 +19,8 @@ jobs:
       - name: Install Build Tools
         run: |
           brew update
-          brew install tinyxml2
+          # Brought back sdl2 and vorbis so we can safely use their headers!
+          brew install sdl2 libvorbis libogg tinyxml2
 
       - name: Generate Dummy Files & Bypasses
         run: |
@@ -62,18 +63,21 @@ jobs:
           EOF
           fi
           
+          # Get iOS SDK path to suppress clang warnings
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          
           # 5. Create a dummy main() function so the Linker doesn't crash
           echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
-          clang -c dummy_main.c -target arm64-apple-ios13.0 -o dummy_main.o
+          clang -c dummy_main.c -isysroot $IOS_SDK -target arm64-apple-ios13.0 -o dummy_main.o
           ar rcs dependencies/ios/libSDLMain.a dummy_main.o
           
           # 6. Create dummy iOS Frameworks ONLY if the real ones are missing
           for fw in Ogg Vorbis SDL2; do
-            if [ ! -f "dependencies/ios/${fw}.framework/${fw}" ]; then
+            if [ ! -d "dependencies/ios/${fw}.framework" ] || [ ! -f "dependencies/ios/${fw}.framework/${fw}" ]; then
               echo "Missing ${fw}, creating dummy framework..."
               mkdir -p dependencies/ios/${fw}.framework
               echo "void dummy_${fw}() {}" > dummy_${fw}.c
-              clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
+              clang -c dummy_${fw}.c -isysroot $IOS_SDK -target arm64-apple-ios13.0 -o dummy_${fw}.o
               ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
             else
               echo "Real ${fw}.framework found! Skipping dummy creation."
@@ -85,6 +89,12 @@ jobs:
         run: |
           ROOT_DIR=$(pwd)
           
+          # Define paths using brew (We NEED these for the Headers!)
+          SDL_INC=$(brew --prefix sdl2)/include
+          VORBIS_INC=$(brew --prefix libvorbis)/include
+          OGG_INC=$(brew --prefix libogg)/include
+          TINYXML_INC=$(brew --prefix tinyxml2)/include
+          
           # Locate headers dynamically
           THEORA_PATH=$(find . -name "theoraplay.h" | head -n 1)
           THEORA_DIR=$(dirname "$THEORA_PATH")
@@ -92,8 +102,8 @@ jobs:
           NATIVE_PATH=$(find . -name "NativeObjects.hpp" | head -n 1)
           NATIVE_DIR=$(dirname "$NATIVE_PATH")
           
-          # Construct Paths (Includes the internal Headers folders of your real frameworks)
-          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $(brew --prefix tinyxml2)/include $ROOT_DIR/dependencies/ios/SDL2.framework/Headers $ROOT_DIR/dependencies/ios/Ogg.framework/Headers $ROOT_DIR/dependencies/ios/Vorbis.framework/Headers"
+          # Construct Paths (Restored Homebrew header paths)
+          HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           # Run xcodebuild
           xcodebuild build \
