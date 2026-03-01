@@ -47,9 +47,8 @@ jobs:
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
-          TINYXML_INC=$(brew --prefix tinyxml2)/include
-          
-          HEADERS="./RSDKv4 ./dependencies/ios ./theoraplay $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          TINYXML_INC=$(brew --prefix tinyxml2)/include         
+          HEADERS="./RSDKv4 ./dependencies/ios ./theoraplay/src $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           # Run build
           # OTHER_CFLAGS="-Wno-deprecated-declarations" ignores the sprintf/error issue
