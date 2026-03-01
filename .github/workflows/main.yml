@@ -18,13 +18,13 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Build and Pack
         run: |
+          # 1. Setup Workspace
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
-
-            - name: Build
-        run: |
+          
+          # 2. Compile the App
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
                      -sdk iphoneos \
@@ -37,26 +37,14 @@ jobs:
                      GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
-
-
-
-
-      - name: Pack IPA
-        if: always()
-        run: |
+          
+          # 3. Create IPA Structure
           mkdir -p Payload
-          # Search everywhere for any .app folder created during this run
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d -path "*/Release-iphoneos/*" | head -n 1)
-          
-          if [ -z "$APP_PATH" ]; then
-            echo "❌ CRITICAL ERROR: Could not find the compiled .app file."
-            exit 1
-          fi
-          
-          echo "✅ Found app at: $APP_PATH"
-          cp -R "$APP_PATH" Payload/
+          APP_DIR=$(find ~/Library/Developer/Xcode/DerivedData -name "RSDKv4.app" -type d | head -n 1)
+          if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
+          cp -r "$APP_DIR" Payload/
           zip -r RSDKv4.ipa Payload
-          
+
       - name: Upload Artifact
         if: success()
         uses: actions/upload-artifact@v4
