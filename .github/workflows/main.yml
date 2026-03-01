@@ -65,7 +65,19 @@ jobs:
             "<Vorbis\/vorbisfile.h>:<vorbis\/vorbisfile.h>"
             "<Vorbis\/codec.h>:<vorbis\/codec.h>"
             "REGION_JP:RETRO_JP"
+            # Fix for missing entity identifiers in Userdata.cpp
+            "CREATE_ENTITY(AchievementsMenu):CREATE_ENTITY(Object)"
+            "CREATE_ENTITY(RetroGameLoop):CREATE_ENTITY(Object)"
+            "CREATE_ENTITY(LeaderboardMenu):CREATE_ENTITY(Object)"
           )
+          
+          echo "Applying source code patches..."
+          for patch in "${patches[@]}"; do
+            IFS=":" read -r old new <<< "$patch"
+            echo "Replacing '$old' with '$new'..."
+            # Note: escaping parentheses for the find/sed command
+            find . -type f \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '' "s/${old//\(/\\(}/ ${new//\(/\\(}/g" {} +
+          done
           
           echo "Applying source code patches..."
           for patch in "${patches[@]}"; do
