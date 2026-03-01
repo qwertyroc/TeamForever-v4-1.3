@@ -1,51 +1,41 @@
-name: iOS Build
+name: Build iOS Project
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: |
           brew install sdl2 libvorbis libogg tinyxml2
 
-      - name: Prepare Assets
+      - name: Patch Source Code
         run: |
-          # Ensure the directory exists
-          mkdir -p dependencies/ios
-          # Create a dummy file if it's missing, or ensure the real one is here
-          touch dependencies/ios/Data.rsdk
-          touch dependencies/ios/Default.png
-      - name: Debug Header Location
-        run: |
-          echo "Looking for theoraplay.h..."
-          find . -name "theoraplay.h"
+          # Fix case-sensitivity include issue in RetroEngine.hpp
+          sed -i '' 's|#include <Vorbis/vorbisfile.h>|#include <vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
+
       - name: Build Project
         run: |
-          # Update this path to the ACTUAL directory where theoraplay.h resides
-          # Example: If it's in a folder called 'theoraplay' inside your project root:
-          THEORAPLAY_DIR="./theoraplay" 
-          
+          # Define paths using brew
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
           OGG_INC=$(brew --prefix libogg)/include
           TINYXML_INC=$(brew --prefix tinyxml2)/include
           
-          HEADERS="./RSDKv4 ./dependencies/ios $THEORAPLAY_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          HEADERS="./RSDKv4 ./dependencies/ios ./theoraplay $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
-          xcodebuild -project "RSDKv4 ios.xcodeproj" \
+          # Run build
+          # OTHER_CFLAGS="-Wno-deprecated-declarations" ignores the sprintf/error issue
+          xcodebuild clean build \
+            -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
             -sdk iphoneos \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath ./build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -54,4 +44,4 @@ jobs:
             HEADER_SEARCH_PATHS="$HEADERS" \
             LIBRARY_SEARCH_PATHS="./dependencies/ios $(brew --prefix sdl2)/lib $(brew --prefix libvorbis)/lib $(brew --prefix libogg)/lib $(brew --prefix tinyxml2)/lib" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            build
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
