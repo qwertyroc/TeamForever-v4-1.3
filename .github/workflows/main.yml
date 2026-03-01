@@ -12,11 +12,15 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
       - name: Install SDL2
-  run: brew install sdl2
-      
+        run: brew install sdl2
+
       - name: Build and Pack
-  run: |
+        run: |
+          SDL2_PATH=$(brew --prefix sdl2)
+          PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES'
+
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
 
@@ -29,10 +33,10 @@ jobs:
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
-                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios" \
-                     HEADER_SEARCH_PATHS="./dependencies/ios" \
-                     LIBRARY_SEARCH_PATHS="./dependencies/ios" \
-                     GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES' \
+                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib" \
+                     HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include" \
+                     LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib" \
+                     GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
 
