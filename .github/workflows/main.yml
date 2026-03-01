@@ -14,12 +14,13 @@ jobs:
           fetch-depth: 0
 
       - name: Install Dependencies
-        run: brew install sdl2 libvorbis
+        run: brew install sdl2 libogg libvorbis
 
       - name: Build and Pack
         run: |
           SDL2_PATH=$(brew --prefix sdl2)
           VORBIS_PATH=$(brew --prefix libvorbis)
+          OGG_PATH=$(brew --prefix libogg)
           PREPROCESSOR_DEFS='$(inherited) RSDK_REVISION=0 RETRO_USING_OPENGL_ES'
 
           mkdir -p dependencies/ios
@@ -34,9 +35,9 @@ jobs:
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
-                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib" \
-                     HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include" \
-                     LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib" \
+                     FRAMEWORK_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib" \
+                     HEADER_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/include $VORBIS_PATH/include $OGG_PATH/include" \
+                     LIBRARY_SEARCH_PATHS="./dependencies/ios $SDL2_PATH/lib $VORBIS_PATH/lib $OGG_PATH/lib" \
                      GCC_PREPROCESSOR_DEFINITIONS="$PREPROCESSOR_DEFS" \
                      EXCLUDED_SOURCE_FILE_NAMES="dependencies/mac/*" \
                      build
@@ -46,7 +47,6 @@ jobs:
           if [ -z "$APP_DIR" ]; then echo "❌ App not found!"; exit 1; fi
           cp -r "$APP_DIR" Payload/
           zip -r RSDKv4.ipa Payload
-
       - name: Upload Artifact
         if: success()
         uses: actions/upload-artifact@v4
