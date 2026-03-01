@@ -47,6 +47,10 @@ jobs:
           cp -r "$APP_DIR" Payload/
           zip -r RSDKv4.ipa Payload
 
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
 
 
