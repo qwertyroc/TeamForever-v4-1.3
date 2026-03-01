@@ -22,7 +22,10 @@ jobs:
           echo "Looking for theoraplay.h..."
           find . -name "theoraplay.h" || echo "Not found in project"
           ls -R $(brew --prefix)/include | grep theoraplay || echo "Not found in brew"
-
+      - name: Create Missing Data.rsdk
+        run: |
+          mkdir -p dependencies/ios
+          touch dependencies/ios/Data.rsdk
       - name: Build Project
         run: |
           # Calculate paths dynamically
