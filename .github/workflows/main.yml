@@ -36,17 +36,24 @@ jobs:
 
       - name: Build and Pack
         run: |
-          # Use -xcconfig to load the paths we just defined
+          # Ensure the directory exists
+          mkdir -p dependencies/ios
+          
+          # If you don't have a real Data.rsdk yet, create an empty one 
+          # but make sure the path matches exactly what the Xcode project expects
+          if [ ! -f "dependencies/ios/Data.rsdk" ]; then
+            touch dependencies/ios/Data.rsdk
+          fi
+
+          # Same for Default.png which also failed in your logs
+          if [ ! -f "dependencies/ios/Default.png" ]; then
+            # Create a dummy 1x1 pixel image or just a blank file
+            touch dependencies/ios/Default.png
+          fi
+
           xcodebuild -project "RSDKv4 ios.xcodeproj" \
                      -scheme "RSDKv4" \
-                     -sdk iphoneos \
-                     -configuration Release \
-                     -derivedDataPath ./build \
-                     -xcconfig ci.xcconfig \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
-                     build
-
+                     
           mkdir -p Payload
           APP_DIR=$(find ./build -name "RSDKv4.app" -type d | head -n 1)
           cp -r "$APP_DIR" Payload/
