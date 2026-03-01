@@ -62,22 +62,6 @@ jobs:
             NATIVE_DIR=""
           fi
 
-          # --- LINKER FIXES ---
-          # 1. Provide a dummy main() because SDL redefines yours to SDL_main
-          echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
-          clang -c dummy_main.c -target arm64-apple-ios13.0 -o dummy_main.o
-          
-          # 2. Create dummy frameworks/libraries to satisfy Xcode's Link Binary phase
-          mkdir -p dependencies/ios
-          ar rcs dependencies/ios/libSDLMain.a dummy_main.o
-          
-          for fw in Ogg Vorbis SDL2; do
-            mkdir -p dependencies/ios/${fw}.framework
-            echo "void dummy_${fw}() {}" > dummy_${fw}.c
-            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
-            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
-          done
-
           # --- BUILD CONFIGURATION ---
           SDL_INC=$(brew --prefix sdl2)/include
           VORBIS_INC=$(brew --prefix libvorbis)/include
@@ -86,6 +70,53 @@ jobs:
           ROOT_DIR=$(pwd)
           
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $THEORA_DIR $NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
+          LIBS="$ROOT_DIR/dependencies/ios"
+          
+          mkdir -p dependencies/ios
+          
+          # --- CREATE MISSING INFO.PLIST ---
+          if [ ! -f "dependencies/ios/Info.plist" ]; then
+            cat << 'EOF' > dependencies/ios/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>$(EXECUTABLE_NAME)</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.retro.rsdk</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>RSDKv4</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>UIRequiresFullScreen</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          fi
+          
+          # --- THE LINKER FIX ---
+          # 1. Create a dummy static library for SDLMain
+          echo "int main(int argc, char *argv[]) { return 0; }" > dummy_main.c
+          clang -c dummy_main.c -target arm64-apple-ios13.0 -o dummy_main.o
+          ar rcs dependencies/ios/libSDLMain.a dummy_main.o
+          
+          # 2. Create dummy iOS Frameworks for Ogg, Vorbis, and SDL2
+          for fw in Ogg Vorbis SDL2; do
+            mkdir -p dependencies/ios/${fw}.framework
+            echo "void dummy_${fw}() {}" > dummy_${fw}.c
+            clang -c dummy_${fw}.c -target arm64-apple-ios13.0 -o dummy_${fw}.o
+            ar rcs dependencies/ios/${fw}.framework/${fw} dummy_${fw}.o
+          done
           
           # Run xcodebuild
           xcodebuild clean build \
@@ -100,9 +131,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             HEADER_SEARCH_PATHS="$HEADERS" \
-            FRAMEWORK_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
-            LIBRARY_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
+            LIBRARY_SEARCH_PATHS="$LIBS" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
-            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error" \
-            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup $ROOT_DIR/dummy_main.o"
+            OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error"
         shell: /bin/bash -e {0}
