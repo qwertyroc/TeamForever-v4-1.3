@@ -17,7 +17,12 @@ jobs:
         run: |
           # Fix case-sensitivity include issue in RetroEngine.hpp
           sed -i '' 's|#include <Vorbis/vorbisfile.h>|#include <vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
-
+      - name: Validate Assets
+        run: |
+          echo "Checking for Data.rsdk..."
+          ls -l ./dependencies/ios/Data.rsdk || echo "Data.rsdk is missing!"
+          echo "Listing contents of dependencies/ios/ to see what is there:"
+          ls -R ./dependencies/ios/
       - name: Build Project
         run: |
           # Define paths using brew
