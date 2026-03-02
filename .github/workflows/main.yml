@@ -32,8 +32,6 @@ jobs:
             if [ -f "${fw}.framework.zip" ]; then
               echo "Extracting ${fw}.framework.zip..."
               unzip -q -o "${fw}.framework.zip"
-            else
-              echo "::warning::${fw}.framework.zip not found. Make sure it is uploaded!"
             fi
           done
           cd ../..
@@ -45,15 +43,23 @@ jobs:
             sed -i '' 's|<Vorbis/vorbisfile.h>|<vorbis/vorbisfile.h>|g' ./RSDKv4/RetroEngine.hpp
           fi
           
-          # Create missing C++ files so the compiler doesn't crash
-          touch ./RSDKv4/RetroGameLoop.cpp
-          touch ./RSDKv4/PauseMenu.cpp
+          # SMART FILE FINDER: Find the REAL missing files instead of making blank ones!
+          for missing_file in "RetroGameLoop.cpp" "PauseMenu.cpp"; do
+            REAL_FILE=$(find . -name "$missing_file" | head -n 1)
+            if [ -n "$REAL_FILE" ] && [ "$REAL_FILE" != "./RSDKv4/$missing_file" ]; then
+              echo "Found real $missing_file. Copying to ./RSDKv4/"
+              cp "$REAL_FILE" "./RSDKv4/$missing_file"
+            else
+              echo "Creating blank file for $missing_file"
+              touch "./RSDKv4/$missing_file"
+            fi
+          done
           
           # Create the dummy Data.rsdk game file 
           mkdir -p dependencies/ios
           touch dependencies/ios/Data.rsdk
           
-          # Generate Info.plist if missing (WITH FILES APP PERMISSIONS!)
+          # Generate Info.plist if missing (WITH FILES APP PERMISSIONS AND CUSTOM NAME)
           if [ ! -f "dependencies/ios/Info.plist" ]; then
             cat << 'EOF' > dependencies/ios/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -64,7 +70,6 @@ jobs:
               <string>$(EXECUTABLE_NAME)</string>
               <key>CFBundleIdentifier</key>
               <string>com.retro.rsdk</string>
-              
               <key>CFBundleName</key>
               <string>RSDKV4</string>
               <key>CFBundleDisplayName</key>
@@ -84,7 +89,7 @@ jobs:
           EOF
           fi
           
-          # Create Empty SDLMain to satisfy linker without crashing the app
+          # Create Empty SDLMain to satisfy linker
           echo "void dummy_empty_function() {}" > empty_main.c
           clang -c empty_main.c -target arm64-apple-ios13.0 -o empty_main.o
           ar rcs dependencies/ios/libSDLMain.a empty_main.o
@@ -93,7 +98,6 @@ jobs:
           sed -i '' 's/-lSDLMain//g' "RSDKv4 ios.xcodeproj/project.pbxproj"
 
           echo "=== 2. FIXING BROKEN SYMLINKS ==="
-          # Windows/Git breaks Apple framework symlinks. This flattens them to fix the Invalid Argument warning.
           for fw in dependencies/ios/*.framework; do
             if [ -d "$fw/Versions/A" ]; then
               cp -r "$fw/Versions/A/"* "$fw/" 2>/dev/null || true
@@ -117,7 +121,8 @@ jobs:
           HEADERS="$ROOT_DIR/RSDKv4 $ROOT_DIR/dependencies/ios $ROOT_DIR/$THEORA_DIR $ROOT_DIR/$NATIVE_DIR $SDL_INC $VORBIS_INC $OGG_INC $TINYXML_INC"
           
           echo "=== 4. RUNNING XCODEBUILD ==="
-          # We added the missing Apple Frameworks to OTHER_LDFLAGS below!
+          # ADDED EXPORT DYNAMIC SO MODS CAN SEE THE ENGINE CODE!
+          # REMOVED DYNAMIC LOOKUP TO CATCH REAL BUILD ERRORS!
           xcodebuild build \
             -project "RSDKv4 ios.xcodeproj" \
             -scheme "RSDKv4" \
@@ -134,7 +139,7 @@ jobs:
             LIBRARY_SEARCH_PATHS="$ROOT_DIR/dependencies/ios" \
             GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) RETRO_USING_OPENGL_ES" \
             OTHER_CFLAGS="-Wno-deprecated-declarations -Wno-error" \
-            OTHER_LDFLAGS="\$(inherited) -undefined dynamic_lookup -F$ROOT_DIR/dependencies/ios -framework GameController -framework CoreHaptics -framework CoreMotion"
+            OTHER_LDFLAGS="\$(inherited) -Xlinker -export_dynamic -F$ROOT_DIR/dependencies/ios -framework GameController -framework CoreHaptics -framework CoreMotion"
         shell: /bin/bash -e {0}
 
       - name: Package IPA
